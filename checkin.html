@@ -13,7 +13,7 @@
   const supabaseUrl = "https://iirtdewqfhxgoccaxkxm.supabase.co";
   const supabaseKey = "sb_publishable_6tLW_KWUnL38KI_uOVaGCQ_mkQELQjM";
 
-  const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
 
   const params = new URLSearchParams(window.location.search);
   const guestCode = params.get("code");
@@ -24,7 +24,7 @@
       return;
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await supabaseClient
       .from("guests")
       .select("*")
       .eq("code", guestCode)
@@ -42,7 +42,7 @@
     }
 
     // Mark as used
-    await supabase
+    await supabaseClient
       .from("guests")
       .update({ used: true })
       .eq("code", guestCode);
