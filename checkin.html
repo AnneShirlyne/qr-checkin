@@ -184,6 +184,29 @@ function showManual() {
   if (scannerRunning) html5QrCode.stop();
 }
 
+  // Save check-in time
+await supabase
+  .from("guests")
+  .update({ 
+    used: true,
+    checkin_time: new Date()
+  })
+  .eq("code", guestCode);
+
+// VIP badge
+let vipBadge = data.vip 
+  ? "<div class='vip-badge'>⭐ VIP Guest</div>" 
+  : "";
+
+document.getElementById("status").innerHTML =
+  "<div class='success-card'>" +
+  "<h1>WELCOME</h1>" +
+  "<h2>" + data.name + "</h2>" +
+  vipBadge +
+  "<p>Table: <strong>" + (data.table_number || "Unassigned") + "</strong></p>" +
+  "<p>Plus One: <strong>" + (data.plus_one ? "Yes" : "No") + "</strong></p>" +
+  "</div>";
+  
 updateCounter();
 initScanner();
 </script>
