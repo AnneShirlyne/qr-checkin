@@ -1,33 +1,33 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Admin Login</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Staff Login</title>
 </head>
+<body style="background:black;color:white;text-align:center;margin-top:100px;font-family:Arial;">
 
-<body style="background:black; color:gold; display:flex; justify-content:center; align-items:center; height:100vh; font-family:Arial;">
+<h1>Event Staff Access</h1>
 
-<div style="text-align:center;">
-  <h1>Event Admin</h1>
-  <input type="password" id="password" placeholder="Enter Password"
-    style="padding:10px; font-size:18px; margin-top:20px;"><br><br>
-  <button onclick="login()" style="padding:10px 20px; font-size:18px; background:gold; border:none;">
-    Login
-  </button>
-</div>
+<input type="password" id="password" placeholder="Enter Staff Password"
+style="padding:10px;font-size:18px;border-radius:8px;border:none;">
+
+<br><br>
+
+<button onclick="login()" 
+style="padding:10px 20px;font-size:18px;border-radius:8px;background:gold;border:none;">
+Enter
+</button>
 
 <script>
-  const adminPassword = "BLcheckin2026"; // 🔐 CHANGE THIS
+function login(){
+  const pass = document.getElementById("password").value;
 
-  function login() {
-    const entered = document.getElementById("password").value;
-    if (entered === adminPassword) {
-      sessionStorage.setItem("adminAuth", "true");
-      window.location.href = "admin.html";
-    } else {
-      alert("Incorrect Password");
-    }
+  if(pass === "Elite2026"){   // 🔐 change this password
+    sessionStorage.setItem("staffAuth", "true");
+    window.location.href = "checkin.html";
+  } else {
+    alert("Wrong password");
   }
+}
 </script>
 
 </body>
