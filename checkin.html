@@ -3,24 +3,38 @@
 <head>
   <title>Event Check-In</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
-<body>
 
-<h2>Checking Guest...</h2>
-<div id="result"></div>
+<body style="
+  font-family: Arial, sans-serif;
+  text-align: center;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  transition: background 0.3s ease;
+">
+
+<div>
+  <h1 id="status" style="font-size: 40px;">Checking Guest...</h1>
+  <div id="result" style="font-size: 26px; margin-top: 20px;"></div>
+</div>
 
 <script>
   const supabaseUrl = "https://iirtdewqfhxgoccaxkxm.supabase.co";
   const supabaseKey = "sb_publishable_6tLW_KWUnL38KI_uOVaGCQ_mkQELQjM";
 
-const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
+  const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
 
   const params = new URLSearchParams(window.location.search);
   const guestCode = params.get("code");
 
   async function checkGuest() {
     if (!guestCode) {
-      document.getElementById("result").innerText = "Invalid QR Code";
+      showError("Invalid QR Code");
       return;
     }
 
@@ -31,24 +45,55 @@ const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
       .single();
 
     if (error || !data) {
-      document.getElementById("result").innerText = "Guest Not Found";
+      showError("Guest Not Found");
       return;
     }
 
-    if (data.used) {
-      document.getElementById("result").innerHTML =
-        "❌ This QR code has already been used.";
+    if (data.used === true) {
+      showError("QR Code Already Used");
       return;
     }
 
-    // Mark as used
-    await supabaseClient
+    const { error: updateError } = await supabaseClient
       .from("guests")
       .update({ used: true })
       .eq("code", guestCode);
 
+    if (updateError) {
+      showError("Error Updating Guest");
+      return;
+    }
+
+    showSuccess(data);
+  }
+
+  function showSuccess(data) {
+    document.body.style.background = "#16a34a"; // green
+    document.getElementById("status").innerText = "✅ ACCESS GRANTED";
+    document.getElementById("status").style.color = "white";
+
     document.getElementById("result").innerHTML =
-      "✅ Welcome " + data.name + "<br>Plus One: " + (data.plus_one ? "Yes" : "No");
+      "<strong>Name:</strong> " + data.name + "<br>" +
+      "<strong>Plus One:</strong> " + (data.plus_one ? "Yes" : "No");
+
+    document.getElementById("result").style.color = "white";
+
+    resetAfterDelay();
+  }
+
+  function showError(message) {
+    document.body.style.background = "#dc2626"; // red
+    document.getElementById("status").innerText = "❌ " + message;
+    document.getElementById("status").style.color = "white";
+    document.getElementById("result").innerHTML = "";
+
+    resetAfterDelay();
+  }
+
+  function resetAfterDelay() {
+    setTimeout(() => {
+      window.location.href = "checkin.html";
+    }, 4000);
   }
 
   checkGuest();
