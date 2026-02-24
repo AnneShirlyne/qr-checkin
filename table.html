@@ -1,0 +1,11 @@
+let tableHTML = "<tr><th>Name</th><th>VIP</th><th>Table</th><th>Plus One</th><th>Status</th></tr>";
+
+data.forEach(g => {
+  tableHTML += "<tr>" +
+    "<td>" + g.name + "</td>" +
+    "<td>" + (g.vip ? "⭐" : "-") + "</td>" +
+    "<td>" + (g.table_number || "-") + "</td>" +
+    "<td>" + (g.plus_one ? "Yes" : "No") + "</td>" +
+    "<td>" + (g.used ? "✅" : "Pending") + "</td>" +
+    "</tr>";
+});
