@@ -19,9 +19,14 @@
 ">
 
 <div>
-  <h1 id="status" style="font-size: 40px;">Checking Guest...</h1>
+  <h1 id="status" style="font-size: 40px;">Ready to Scan</h1>
   <div id="result" style="font-size: 26px; margin-top: 20px;"></div>
+  <div id="counter" style="margin-top:30px; font-size:20px;"></div>
 </div>
+
+<audio id="successSound">
+  <source src="https://www.soundjay.com/buttons/sounds/button-3.mp3" type="audio/mpeg">
+</audio>
 
 <script>
   const supabaseUrl = "https://iirtdewqfhxgoccaxkxm.supabase.co";
@@ -32,9 +37,20 @@
   const params = new URLSearchParams(window.location.search);
   const guestCode = params.get("code");
 
+  async function updateCounter() {
+    const { count } = await supabaseClient
+      .from("guests")
+      .select("*", { count: "exact", head: true })
+      .eq("used", true);
+
+    document.getElementById("counter").innerText =
+      "Total Checked In: " + count;
+  }
+
   async function checkGuest() {
+
     if (!guestCode) {
-      showError("Invalid QR Code");
+      updateCounter();
       return;
     }
 
@@ -54,21 +70,17 @@
       return;
     }
 
-    const { error: updateError } = await supabaseClient
+    await supabaseClient
       .from("guests")
       .update({ used: true })
       .eq("code", guestCode);
 
-    if (updateError) {
-      showError("Error Updating Guest");
-      return;
-    }
-
     showSuccess(data);
+    updateCounter();
   }
 
   function showSuccess(data) {
-    document.body.style.background = "#16a34a"; // green
+    document.body.style.background = "#16a34a";
     document.getElementById("status").innerText = "✅ ACCESS GRANTED";
     document.getElementById("status").style.color = "white";
 
@@ -78,19 +90,19 @@
 
     document.getElementById("result").style.color = "white";
 
-    resetAfterDelay();
+    document.getElementById("successSound").play();
+
+    setTimeout(() => {
+      window.location.href = "checkin.html";
+    }, 4000);
   }
 
   function showError(message) {
-    document.body.style.background = "#dc2626"; // red
+    document.body.style.background = "#dc2626";
     document.getElementById("status").innerText = "❌ " + message;
     document.getElementById("status").style.color = "white";
     document.getElementById("result").innerHTML = "";
 
-    resetAfterDelay();
-  }
-
-  function resetAfterDelay() {
     setTimeout(() => {
       window.location.href = "checkin.html";
     }, 4000);
@@ -101,3 +113,8 @@
 
 </body>
 </html>
+      
+
+
+
+  
