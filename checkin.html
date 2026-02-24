@@ -1,208 +1,173 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>BOMEXA Check-In</title>
+<title>BOMEXA Check-In</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://unpkg.com/html5-qrcode"></script>
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="https://unpkg.com/html5-qrcode"></script>
-
-  <style>
-    body {
-      background:#111;
-      color:white;
-      font-family:Arial;
-      text-align:center;
-      margin-top:40px;
-    }
-
-    button {
-      padding:10px 20px;
-      margin:10px;
-      border-radius:8px;
-      border:none;
-      cursor:pointer;
-    }
-
-    #reader {
-      width:300px;
-      margin:auto;
-      margin-top:20px;
-    }
-
-    .success { color:lime; font-size:22px; }
-    .error { color:red; font-size:22px; }
-  </style>
+<style>
+body{
+  background:#0f0f0f;
+  color:#d4af37;
+  font-family:Arial;
+  text-align:center;
+  margin-top:40px;
+}
+h2{font-size:28px;}
+#reader{width:300px;margin:auto;}
+button{
+  padding:10px 20px;
+  margin:10px;
+  border:none;
+  background:#d4af37;
+  cursor:pointer;
+}
+input{
+  padding:10px;
+  font-size:16px;
+}
+.success{
+  font-size:40px;
+  animation:pop .4s ease;
+}
+.error{
+  font-size:28px;
+  color:red;
+}
+@keyframes pop{
+  0%{transform:scale(.6);opacity:0;}
+  100%{transform:scale(1);opacity:1;}
+}
+.counter{
+  position:absolute;
+  top:20px;
+  right:30px;
+  font-size:18px;
+}
+</style>
 </head>
 
 <body>
 
+<script>
+if(sessionStorage.getItem("staffAuth") !== "true"){
+  window.location.href="login.html";
+}
+</script>
+
+<div class="counter">
+Checked In: <span id="count">0</span>
+</div>
+
 <h2 id="status">Ready to Scan</h2>
+<div id="result"></div>
 
 <div id="reader"></div>
 
-<div style="margin-top:20px;">
-  <button onclick="switchCamera()">Switch Camera</button>
-</div>
+<br>
+<button onclick="switchCamera()">Switch Camera</button>
 
-<div style="margin-top:30px;">
-  <input type="text" id="manualCode" placeholder="Enter code manually">
-  <button onclick="manualCheck()">Check In</button>
-</div>
+<br><br>
+
+<input type="text" id="manualInput" placeholder="Enter Name or Code">
+<button onclick="manualCheck()">Check In</button>
 
 <script>
 
-  // 🔐 Staff protection
-  if(sessionStorage.getItem("staffAuth") !== "true"){
-    window.location.href = "login.html";
-  }
-
-  <script>
-    
+// 🔹 YOUR SUPABASE INFO
 const supabaseUrl = "https://iirtdewqfhxgoccaxkxm.supabase.co";
 const supabaseKey = "sb_publishable_6tLW_KWUnL38KI_uOVaGCQ_mkQELQjM";
 const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
 
-let html5QrCode = new Html5Qrcode("reader");
-let cameras = [];
-let currentCameraId = null;
-let scannerRunning = false;
+let html5QrCode;
+let currentCamera = "environment";
+let checkedCount = 0;
 
-async function updateCounter() {
-  const { count } = await supabase
+async function updateCounter(){
+  const { count } = await supabaseClient
     .from("guests")
     .select("*", { count: "exact", head: true })
     .eq("used", true);
-
-  document.getElementById("counter").innerText =
-    "Total Checked In: " + (count || 0);
+  document.getElementById("count").innerText = count;
 }
 
-async function processGuest(data) {
-  if (!data) {
-    showError("Guest Not Found");
+function restart(){
+  setTimeout(()=>{
+    document.getElementById("status").innerText="Ready to Scan";
+    document.getElementById("result").innerHTML="";
+  },4000);
+}
+
+async function processCode(inputValue){
+
+  document.getElementById("status").innerText="Checking Guest...";
+
+  let { data, error } = await supabaseClient
+    .from("guests")
+    .select("*")
+    .or(`code.eq.${inputValue},name.ilike.%${inputValue}%`)
+    .limit(1)
+    .single();
+
+  if(error || !data){
+    document.getElementById("status").innerHTML=
+      "<div class='error'>Guest Not Found</div>";
+    restart();
     return;
   }
 
-  if (data.used) {
-    showError("Already Checked In");
+  if(data.used){
+    document.getElementById("status").innerHTML=
+      "<div class='error'>Already Checked In</div>";
+    restart();
     return;
   }
 
   await supabaseClient
     .from("guests")
-    .update({ used: true })
-    .eq("code", data.code);
+    .update({ used:true })
+    .eq("id", data.id);
 
-  showSuccess(data);
+  document.getElementById("status").innerHTML=
+    "<div class='success'>🎉 Welcome "+data.name+"</div>";
+
+  document.getElementById("result").innerHTML=
+    "<strong>Plus One:</strong> "+
+    (data.plus_one ? data.plus_one : "None");
+
   updateCounter();
+  restart();
 }
 
-async function processCode(code) {
-  const { data } = await supabaseClient
-    .from("guests")
-    .select("*")
-    .eq("code", code)
-    .single();
-
-  processGuest(data);
+function manualCheck(){
+  const value=document.getElementById("manualInput").value;
+  if(value) processCode(value);
 }
 
-async function manualSearch() {
-  const input = document.getElementById("manualInput").value;
-
-  const { data } = await supabaseClient
-    .from("guests")
-    .select("*")
-    .or(`name.ilike.%${input}%,code.eq.${input}`)
-    .limit(1);
-
-  processGuest(data[0]);
+function onScanSuccess(decodedText){
+  processCode(decodedText);
 }
 
-function showSuccess(data) {
-  document.body.style.background = "#16a34a";
-  document.getElementById("status").innerText = "ACCESS GRANTED";
-  document.getElementById("result").innerHTML =
-    "Welcome " + data.name +
-    "<br>Plus One: " + (data.plus_one ? "Yes" : "No");
-  document.getElementById("successSound").play();
-  setTimeout(resetScreen, 4000);
-}
-
-function showError(msg) {
-  document.body.style.background = "#dc2626";
-  document.getElementById("status").innerText = msg;
-  document.getElementById("result").innerHTML = "";
-  setTimeout(resetScreen, 4000);
-}
-
-function resetScreen() {
-  document.body.style.background = "black";
-  document.getElementById("status").innerText = "Ready";
-  document.getElementById("result").innerHTML = "";
-}
-
-async function startScanner(cameraId) {
-  scannerRunning = true;
-  await html5QrCode.start(
-    cameraId,
-    { fps: 10, qrbox: 250 },
-    qrMessage => {
-      html5QrCode.stop().then(() => {
-        scannerRunning = false;
-        try {
-          const url = new URL(qrMessage);
-          processCode(url.searchParams.get("code"));
-        } catch {
-          processCode(qrMessage);
-        }
-        setTimeout(() => startScanner(currentCameraId), 4000);
-      });
-    }
+function startScanner(){
+  html5QrCode=new Html5Qrcode("reader");
+  html5QrCode.start(
+    { facingMode: currentCamera },
+    { fps:10, qrbox:250 },
+    onScanSuccess
   );
 }
 
-async function initScanner() {
-  cameras = await Html5Qrcode.getCameras();
-  if (!cameras.length) return;
-
-  const backCam = cameras.find(cam =>
-    cam.label.toLowerCase().includes("back") ||
-    cam.label.toLowerCase().includes("environment")
-  );
-
-  currentCameraId = backCam ? backCam.id : cameras[0].id;
-  startScanner(currentCameraId);
+function switchCamera(){
+  html5QrCode.stop().then(()=>{
+    currentCamera = currentCamera === "environment" ? "user" : "environment";
+    startScanner();
+  });
 }
 
-async function switchCamera() {
-  if (cameras.length < 2) return;
-
-  await html5QrCode.stop();
-  scannerRunning = false;
-
-  const currentIndex = cameras.findIndex(cam => cam.id === currentCameraId);
-  currentCameraId = cameras[(currentIndex + 1) % cameras.length].id;
-  startScanner(currentCameraId);
-}
-
-function showScanner() {
-  document.getElementById("scannerSection").style.display = "block";
-  document.getElementById("manualSection").style.display = "none";
-}
-
-function showManual() {
-  document.getElementById("scannerSection").style.display = "none";
-  document.getElementById("manualSection").style.display = "block";
-  if (scannerRunning) html5QrCode.stop();
-}
-
+startScanner();
 updateCounter();
-initScanner();
+
 </script>
 
 </body>
 </html>
-  
-
-
