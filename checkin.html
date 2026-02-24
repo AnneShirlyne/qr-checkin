@@ -56,93 +56,153 @@
     window.location.href = "login.html";
   }
 
-  const supabaseUrl = "https://iirtdewqfhxgoccaxkxm.supabase.co";
-  const supabaseKey = "sb_publishable_6tLW_KWUnL38KI_uOVaGCQ_mkQELQjM";
-  const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
+  <script>
+    
+const supabaseUrl = "https://iirtdewqfhxgoccaxkxm.supabase.co";
+const supabaseKey = "sb_publishable_6tLW_KWUnL38KI_uOVaGCQ_mkQELQjM";
+const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
 
-  const html5QrCode = new Html5Qrcode("reader");
+let html5QrCode = new Html5Qrcode("reader");
+let cameras = [];
+let currentCameraId = null;
+let scannerRunning = false;
 
-  let currentCamera = "environment";
+async function updateCounter() {
+  const { count } = await supabase
+    .from("guests")
+    .select("*", { count: "exact", head: true })
+    .eq("used", true);
 
-  function startScanner() {
-    html5QrCode.start(
-      { facingMode: currentCamera },
-      { fps: 10, qrbox: 250 },
-      qrMessage => {
-        html5QrCode.stop();
-        const codeParam = new URL(qrMessage).searchParams.get("code");
-        if (codeParam) processCode(codeParam);
-        else processCode(qrMessage);
-      }
-    );
+  document.getElementById("counter").innerText =
+    "Total Checked In: " + (count || 0);
+}
+
+async function processGuest(data) {
+  if (!data) {
+    showError("Guest Not Found");
+    return;
   }
 
-  function switchCamera() {
-    html5QrCode.stop().then(() => {
-      currentCamera = currentCamera === "environment" ? "user" : "environment";
-      startScanner();
-    });
+  if (data.used) {
+    showError("Already Checked In");
+    return;
   }
 
-  async function processCode(code) {
+  await supabaseClient
+    .from("guests")
+    .update({ used: true })
+    .eq("code", data.code);
 
-    document.getElementById("status").innerText = "Checking Guest...";
+  showSuccess(data);
+  updateCounter();
+}
 
-    const { data, error } = await supabaseClient
-      .from("guests")
-      .select("*")
-      .eq("code", code)
-      .single();
+async function processCode(code) {
+  const { data } = await supabaseClient
+    .from("guests")
+    .select("*")
+    .eq("code", code)
+    .single();
 
-    if (error || !data) {
-      document.getElementById("status").innerHTML =
-        "<div class='error'>Guest Not Found</div>";
-      restart();
-      return;
+  processGuest(data);
+}
+
+async function manualSearch() {
+  const input = document.getElementById("manualInput").value;
+
+  const { data } = await supabaseClient
+    .from("guests")
+    .select("*")
+    .or(`name.ilike.%${input}%,code.eq.${input}`)
+    .limit(1);
+
+  processGuest(data[0]);
+}
+
+function showSuccess(data) {
+  document.body.style.background = "#16a34a";
+  document.getElementById("status").innerText = "ACCESS GRANTED";
+  document.getElementById("result").innerHTML =
+    "Welcome " + data.name +
+    "<br>Plus One: " + (data.plus_one ? "Yes" : "No");
+  document.getElementById("successSound").play();
+  setTimeout(resetScreen, 4000);
+}
+
+function showError(msg) {
+  document.body.style.background = "#dc2626";
+  document.getElementById("status").innerText = msg;
+  document.getElementById("result").innerHTML = "";
+  setTimeout(resetScreen, 4000);
+}
+
+function resetScreen() {
+  document.body.style.background = "black";
+  document.getElementById("status").innerText = "Ready";
+  document.getElementById("result").innerHTML = "";
+}
+
+async function startScanner(cameraId) {
+  scannerRunning = true;
+  await html5QrCode.start(
+    cameraId,
+    { fps: 10, qrbox: 250 },
+    qrMessage => {
+      html5QrCode.stop().then(() => {
+        scannerRunning = false;
+        try {
+          const url = new URL(qrMessage);
+          processCode(url.searchParams.get("code"));
+        } catch {
+          processCode(qrMessage);
+        }
+        setTimeout(() => startScanner(currentCameraId), 4000);
+      });
     }
+  );
+}
 
-    if (data.used) {
-      document.getElementById("status").innerHTML =
-        "<div class='error'>QR Code Already Used</div>";
-      restart();
-      return;
-    }
+async function initScanner() {
+  cameras = await Html5Qrcode.getCameras();
+  if (!cameras.length) return;
 
-    await supabaseClient
-      .from("guests")
-      .update({ used: true })
-      .eq("code", code);
+  const backCam = cameras.find(cam =>
+    cam.label.toLowerCase().includes("back") ||
+    cam.label.toLowerCase().includes("environment")
+  );
 
-    document.getElementById("status").innerHTML =
-      "<div class='success'>Welcome " + data.name + "</div>";
+  currentCameraId = backCam ? backCam.id : cameras[0].id;
+  startScanner(currentCameraId);
+}
 
-    restart();
-  }
+async function switchCamera() {
+  if (cameras.length < 2) return;
 
-  function manualCheck() {
-    const code = document.getElementById("manualCode").value.trim();
-    if (code) processCode(code);
-  }
+  await html5QrCode.stop();
+  scannerRunning = false;
 
-  function restart() {
-    setTimeout(() => {
-      document.getElementById("status").innerText = "Ready to Scan";
-      document.getElementById("manualCode").value = "";
-      startScanner();
-    }, 4000);
-  }
+  const currentIndex = cameras.findIndex(cam => cam.id === currentCameraId);
+  currentCameraId = cameras[(currentIndex + 1) % cameras.length].id;
+  startScanner(currentCameraId);
+}
 
-  // If QR link contains ?code= param
-  const params = new URLSearchParams(window.location.search);
-  const urlCode = params.get("code");
+function showScanner() {
+  document.getElementById("scannerSection").style.display = "block";
+  document.getElementById("manualSection").style.display = "none";
+}
 
-  if (urlCode) {
-    processCode(urlCode);
-  } else {
-    startScanner();
-  }
+function showManual() {
+  document.getElementById("scannerSection").style.display = "none";
+  document.getElementById("manualSection").style.display = "block";
+  if (scannerRunning) html5QrCode.stop();
+}
 
+updateCounter();
+initScanner();
 </script>
 
 </body>
 </html>
+  
+
+
