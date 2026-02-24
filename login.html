@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Admin Login</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+
+<body style="background:black; color:gold; display:flex; justify-content:center; align-items:center; height:100vh; font-family:Arial;">
+
+<div style="text-align:center;">
+  <h1>Event Admin</h1>
+  <input type="password" id="password" placeholder="Enter Password"
+    style="padding:10px; font-size:18px; margin-top:20px;"><br><br>
+  <button onclick="login()" style="padding:10px 20px; font-size:18px; background:gold; border:none;">
+    Login
+  </button>
+</div>
+
+<script>
+  const adminPassword = "EVENT2026"; // 🔐 CHANGE THIS
+
+  function login() {
+    const entered = document.getElementById("password").value;
+    if (entered === adminPassword) {
+      sessionStorage.setItem("adminAuth", "true");
+      window.location.href = "admin.html";
+    } else {
+      alert("Incorrect Password");
+    }
+  }
+</script>
+
+</body>
+</html>
