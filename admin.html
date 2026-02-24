@@ -83,3 +83,11 @@
 
 </body>
 </html>
+supabase
+  .channel('realtime guests')
+  .on('postgres_changes', 
+      { event: '*', schema: 'public', table: 'guests' }, 
+      () => {
+        loadStats();
+      })
+  .subscribe();
