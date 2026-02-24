@@ -2,6 +2,38 @@
 }<!DOCTYPE html>
 <html>
 <head>
+  <style>
+body {
+  background: linear-gradient(135deg,#000,#1a1a1a);
+  color: gold;
+  font-family: 'Georgia', serif;
+}
+
+.success-card {
+  background:#111;
+  border:2px solid gold;
+  padding:40px;
+  border-radius:20px;
+  box-shadow:0 0 25px gold;
+  animation: fadeIn 0.6s ease;
+}
+
+.vip-badge {
+  background:gold;
+  color:black;
+  padding:8px 15px;
+  border-radius:20px;
+  display:inline-block;
+  margin:10px 0;
+  font-weight:bold;
+}
+
+@keyframes fadeIn {
+  from {opacity:0; transform:translateY(20px);}
+  to {opacity:1; transform:translateY(0);}
+}
+</style>
+  
   <title>Event Check-In</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://unpkg.com/html5-qrcode"></script>
