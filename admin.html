@@ -83,7 +83,7 @@
 
 </body>
 </html>
-supabase
+supabaseClient
   .channel('realtime guests')
   .on('postgres_changes', 
       { event: '*', schema: 'public', table: 'guests' }, 
@@ -91,3 +91,24 @@ supabase
         loadStats();
       })
   .subscribe();
+<button onclick="exportCSV()" style="background:gold; padding:10px; border:none; margin-top:20px;">
+Export Checked-In Guests
+</button>
+async function exportCSV() {
+  const { data } = await supabaseClient
+    .from("guests")
+    .select("*")
+    .eq("used", true);
+
+  let csv = "Name,Plus One\n";
+
+  data.forEach(g => {
+    csv += `${g.name},${g.plus_one ? "Yes" : "No"}\n`;
+  });
+
+  const blob = new Blob([csv], { type: "text/csv" });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = "checked_in_guests.csv";
+  link.click();
+}
