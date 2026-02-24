@@ -1,246 +1,88 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <style>
-body {
-  background: linear-gradient(135deg,#000,#1a1a1a);
-  color: gold;
-  font-family: 'Georgia', serif;
-}
-
-.success-card {
-  background:#111;
-  border:2px solid gold;
-  padding:40px;
-  border-radius:20px;
-  box-shadow:0 0 25px gold;
-  animation: fadeIn 0.6s ease;
-}
-
-.vip-badge {
-  background:gold;
-  color:black;
-  padding:8px 15px;
-  border-radius:20px;
-  display:inline-block;
-  margin:10px 0;
-  font-weight:bold;
-}
-
-@keyframes fadeIn {
-  from {opacity:0; transform:translateY(20px);}
-  to {opacity:1; transform:translateY(0);}
-}
-</style>
-  
   <title>Event Check-In</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="https://unpkg.com/html5-qrcode"></script>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <style>
+    body {
+      background: linear-gradient(135deg,#000,#1a1a1a);
+      color: gold;
+      font-family: 'Georgia', serif;
+      text-align: center;
+      margin-top: 80px;
+    }
+
+    .success-card {
+      background:#111;
+      border:2px solid gold;
+      padding:40px;
+      border-radius:20px;
+      box-shadow:0 0 25px gold;
+      animation: fadeIn 0.6s ease;
+      display:inline-block;
+      min-width:300px;
+    }
+
+    .vip-badge {
+      background:gold;
+      color:black;
+      padding:8px 15px;
+      border-radius:20px;
+      display:inline-block;
+      margin:15px 0;
+      font-weight:bold;
+    }
+
+    @keyframes fadeIn {
+      from {opacity:0; transform:translateY(20px);}
+      to {opacity:1; transform:translateY(0);}
+    }
+
+    @keyframes pop {
+      0% {transform: scale(0.5); opacity:0;}
+      100% {transform: scale(1); opacity:1;}
+    }
+  </style>
 </head>
 
-<body style="background:black; color:gold; font-family:Arial; text-align:center; margin:0; padding:20px;">
+<body>
 
-<h1>Event Check-In</h1>
-
-<div style="margin-bottom:20px;">
-  <button onclick="showScanner()" style="padding:8px 15px; background:gold; border:none;">Scan QR</button>
-  <button onclick="showManual()" style="padding:8px 15px; background:gold; border:none;">Manual Check-In</button>
-</div>
-
-<!-- SCANNER SECTION -->
-<div id="scannerSection">
-  <div id="reader" style="width:300px; margin:20px auto;"></div>
-  <button onclick="switchCamera()" 
-    style="padding:8px 15px; background:gold; border:none;">
-    Switch Camera
-  </button>
-</div>
-
-<!-- MANUAL SECTION -->
-<div id="manualSection" style="display:none; margin-top:20px;">
-  <input type="text" id="manualInput" placeholder="Enter Name or Code"
-    style="padding:10px; font-size:16px; width:250px;">
-  <button onclick="manualSearch()" 
-    style="padding:10px; background:gold; border:none;">
-    Check In
-  </button>
-</div>
-
-<h2 id="status" style="margin-top:20px;">Ready</h2>
-<div id="result" style="font-size:20px; margin-top:10px;"></div>
-<div id="counter" style="margin-top:20px;"></div>
-
-<audio id="successSound">
-  <source src="https://www.soundjay.com/buttons/sounds/button-3.mp3" type="audio/mpeg">
-</audio>
+<h2 id="status">Checking Guest...</h2>
+<div id="result"></div>
 
 <script>
-const supabaseUrl = "https://iirtdewqfhxgoccaxkxm.supabase.co";
-const supabaseKey = "sb_publishable_6tLW_KWUnL38KI_uOVaGCQ_mkQELQjM";
-const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
-
-let html5QrCode = new Html5Qrcode("reader");
-let cameras = [];
-let currentCameraId = null;
-let scannerRunning = false;
-
-async function updateCounter() {
-  const { count } = await supabaseClient 
-    .from("guests")
-    .select("*", { count: "exact", head: true })
-    .eq("used", true);
-
-  document.getElementById("counter").innerText =
-    "Total Checked In: " + (count || 0);
-}
-
-async function processGuest(data) {
-  if (!data) {
-    showError("Guest Not Found");
-    return;
+  // 🔐 STAFF PROTECTION
+  if(sessionStorage.getItem("staffAuth") !== "true"){
+    window.location.href = "login.html";
   }
 
-  if (data.used) {
-    showError("Already Checked In");
-    return;
-  }
+  // 🔹 YOUR SUPABASE INFO
+  const supabaseUrl = "https://iirtdewqfhxgoccaxkxm.supabase.co";
+  const supabaseKey = "YOUR_PUBLISHABLE_KEY_HERE";
 
-  await supabaseClient
-    .from("guests")
-    .update({ used: true })
-    .eq("code", data.code);
+  const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
 
-  showSuccess(data);
-  updateCounter();
-}
+  const params = new URLSearchParams(window.location.search);
+  const guestCode = params.get("code");
 
-async function processCode(code) {
-  const { data } = await supabaseClient
-    .from("guests")
-    .select("*")
-    .eq("code", code)
-    .single();
+  async function checkGuest() {
 
-  processGuest(data);
-}
-
-async function manualSearch() {
-  const input = document.getElementById("manualInput").value;
-
-  const { data } = await supabaseClient
-    .from("guests")
-    .select("*")
-    .or(`name.ilike.%${input}%,code.eq.${input}`)
-    .limit(1);
-
-  processGuest(data[0]);
-}
-
-function showSuccess(data) {
-  document.body.style.background = "#16a34a";
-  document.getElementById("status").innerText = "ACCESS GRANTED";
-  document.getElementById("result").innerHTML =
-    "Welcome " + data.name +
-    "<br>Plus One: " + (data.plus_one ? "Yes" : "No");
-  document.getElementById("successSound").play();
-  setTimeout(resetScreen, 4000);
-}
-
-function showError(msg) {
-  document.body.style.background = "#dc2626";
-  document.getElementById("status").innerText = msg;
-  document.getElementById("result").innerHTML = "";
-  setTimeout(resetScreen, 4000);
-}
-
-function resetScreen() {
-  document.body.style.background = "black";
-  document.getElementById("status").innerText = "Ready";
-  document.getElementById("result").innerHTML = "";
-}
-
-async function startScanner(cameraId) {
-  scannerRunning = true;
-  await html5QrCode.start(
-    cameraId,
-    { fps: 10, qrbox: 250 },
-    qrMessage => {
-      html5QrCode.stop().then(() => {
-        scannerRunning = false;
-        try {
-          const url = new URL(qrMessage);
-          processCode(url.searchParams.get("code"));
-        } catch {
-          processCode(qrMessage);
-        }
-        setTimeout(() => startScanner(currentCameraId), 4000);
-      });
+    if (!guestCode) {
+      document.getElementById("status").innerText = "Invalid QR Code";
+      return;
     }
-  );
-}
 
-async function initScanner() {
-  cameras = await Html5Qrcode.getCameras();
-  if (!cameras.length) return;
+    const { data, error } = await supabaseClient
+      .from("guests")
+      .select("*")
+      .eq("code", guestCode)
+      .single();
 
-  const backCam = cameras.find(cam =>
-    cam.label.toLowerCase().includes("back") ||
-    cam.label.toLowerCase().includes("environment")
-  );
+    if (error || !data) {
+      document.getElementById("status").innerText = "Guest Not Found";
+      return;
+    }
 
-  currentCameraId = backCam ? backCam.id : cameras[0].id;
-  startScanner(currentCameraId);
-}
-
-async function switchCamera() {
-  if (cameras.length < 2) return;
-
-  await html5QrCode.stop();
-  scannerRunning = false;
-
-  const currentIndex = cameras.findIndex(cam => cam.id === currentCameraId);
-  currentCameraId = cameras[(currentIndex + 1) % cameras.length].id;
-  startScanner(currentCameraId);
-}
-
-function showScanner() {
-  document.getElementById("scannerSection").style.display = "block";
-  document.getElementById("manualSection").style.display = "none";
-}
-
-function showManual() {
-  document.getElementById("scannerSection").style.display = "none";
-  document.getElementById("manualSection").style.display = "block";
-  if (scannerRunning) html5QrCode.stop();
-}
-
-  // Save check-in time
-await supabase
-  .from("guests")
-  .update({ 
-    used: true,
-    checkin_time: new Date()
-  })
-  .eq("code", guestCode);
-
-// VIP badge
-let vipBadge = data.vip 
-  ? "<div class='vip-badge'>⭐ VIP Guest</div>" 
-  : "";
-
-document.getElementById("status").innerHTML =
-  "<div class='success-card'>" +
-  "<h1>WELCOME</h1>" +
-  "<h2>" + data.name + "</h2>" +
-  vipBadge +
-  "<p>Table: <strong>" + (data.table_number || "Unassigned") + "</strong></p>" +
-  "<p>Plus One: <strong>" + (data.plus_one ? "Yes" : "No") + "</strong></p>" +
-  "</div>";
-  
-updateCounter();
-initScanner();
-</script>
-
-</body>
-</html>
+    if (data.used === true) {
+      document
