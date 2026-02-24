@@ -3,112 +3,70 @@
 <head>
   <title>Admin Dashboard</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
+<body style="background:#111;color:white;font-family:Arial;padding:30px;">
 
-<body style="background:black; color:gold; font-family:Arial; padding:30px;">
+<h1>Live Guest Dashboard</h1>
 
-<h1>Event Dashboard</h1>
+<h2 id="counter">Loading...</h2>
 
-<div id="stats" style="margin-top:20px; font-size:20px;"></div>
-
-<h2 style="margin-top:40px;">Manual Check-In</h2>
-<input type="text" id="searchName" placeholder="Enter Guest Name"
-  style="padding:10px; font-size:16px;">
-<button onclick="searchGuest()" style="padding:10px; background:gold; border:none;">
-  Search
+<button onclick="exportCSV()" 
+style="padding:10px 20px;background:gold;border:none;border-radius:8px;">
+Export CSV
 </button>
 
-<div id="searchResult" style="margin-top:20px;"></div>
+<br><br>
+
+<table border="1" cellpadding="10" id="guestTable"></table>
 
 <script>
-  if (sessionStorage.getItem("adminAuth") !== "true") {
-    window.location.href = "login.html";
-  }
+const supabaseUrl = "YOUR_SUPABASE_URL";
+const supabaseKey = "YOUR_PUBLISHABLE_KEY";
+const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
 
-  const supabaseUrl = "https://iirtdewqfhxgoccaxkxm.supabase.co";
-  const supabaseKey = "sb_publishable_6tLW_KWUnL38KI_uOVaGCQ_mkQELQjM";
-  const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
+async function loadGuests(){
+  const { data } = await supabaseClient
+    .from("guests")
+    .select("*")
+    .order("name");
 
-  async function loadStats() {
-    const { count: total } = await supabaseClient
-      .from("guests")
-      .select("*", { count: "exact", head: true });
+  const checkedIn = data.filter(g => g.used).length;
 
-    const { count: checkedIn } = await supabaseClient
-      .from("guests")
-      .select("*", { count: "exact", head: true })
-      .eq("used", true);
+  document.getElementById("counter").innerText =
+    "Checked In: " + checkedIn + " / " + data.length;
 
-    document.getElementById("stats").innerHTML =
-      "Total Invited: " + total +
-      "<br>Checked In: " + checkedIn +
-      "<br>Remaining: " + (total - checkedIn);
-  }
+  let tableHTML = "<tr><th>Name</th><th>Plus One</th><th>Status</th></tr>";
 
-  async function searchGuest() {
-    const name = document.getElementById("searchName").value;
+  data.forEach(g => {
+    tableHTML += "<tr>" +
+      "<td>" + g.name + "</td>" +
+      "<td>" + (g.plus_one ? "Yes" : "No") + "</td>" +
+      "<td>" + (g.used ? "✅" : "Pending") + "</td>" +
+      "</tr>";
+  });
 
-    const { data } = await supabaseClient
-      .from("guests")
-      .select("*")
-      .ilike("name", "%" + name + "%");
+  document.getElementById("guestTable").innerHTML = tableHTML;
+}
 
-    if (!data || data.length === 0) {
-      document.getElementById("searchResult").innerHTML = "No Guest Found";
-      return;
-    }
+function exportCSV(){
+  supabaseClient.from("guests").select("*").then(({data})=>{
+    let csv = "Name,Plus One,Checked In\n";
+    data.forEach(g=>{
+      csv += `${g.name},${g.plus_one},${g.used}\n`;
+    });
 
-    const guest = data[0];
+    const blob = new Blob([csv], {type:"text/csv"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "guest_list.csv";
+    a.click();
+  });
+}
 
-    document.getElementById("searchResult").innerHTML =
-      "Name: " + guest.name +
-      "<br>Plus One: " + (guest.plus_one ? "Yes" : "No") +
-      "<br>Status: " + (guest.used ? "Already Checked In" :
-      "<button onclick='manualCheckIn(\"" + guest.code + "\")' style='background:gold; border:none; padding:5px;'>Check In</button>");
-  }
-
-  async function manualCheckIn(code) {
-    await supabaseClient
-      .from("guests")
-      .update({ used: true })
-      .eq("code", code);
-
-    loadStats();
-    document.getElementById("searchResult").innerHTML = "Guest Checked In!";
-  }
-
-  loadStats();
+setInterval(loadGuests, 3000); // live refresh every 3 sec
+loadGuests();
 </script>
 
 </body>
 </html>
-supabaseClient
-  .channel('realtime guests')
-  .on('postgres_changes', 
-      { event: '*', schema: 'public', table: 'guests' }, 
-      () => {
-        loadStats();
-      })
-  .subscribe();
-<button onclick="exportCSV()" style="background:gold; padding:10px; border:none; margin-top:20px;">
-Export Checked-In Guests
-</button>
-async function exportCSV() {
-  const { data } = await supabaseClient
-    .from("guests")
-    .select("*")
-    .eq("used", true);
-
-  let csv = "Name,Plus One\n";
-
-  data.forEach(g => {
-    csv += `${g.name},${g.plus_one ? "Yes" : "No"}\n`;
-  });
-
-  const blob = new Blob([csv], { type: "text/csv" });
-  const link = document.createElement("a");
-  link.href = URL.createObjectURL(blob);
-  link.download = "checked_in_guests.csv";
-  link.click();
-}
