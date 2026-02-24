@@ -3,112 +3,109 @@
 <head>
   <title>Event Check-In</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://unpkg.com/html5-qrcode"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 
-<body style="
-  font-family: Arial, sans-serif;
-  text-align: center;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100vh;
-  transition: background 0.3s ease;
-">
+<body style="background:black; color:gold; font-family:Arial; text-align:center;">
 
-<div>
-  <h1 id="status" style="font-size: 40px;">Ready to Scan</h1>
-  <div id="result" style="font-size: 26px; margin-top: 20px;"></div>
-  <div id="counter" style="margin-top:30px; font-size:20px;"></div>
-</div>
+<h1 style="margin-top:30px;">Event Check-In</h1>
+
+<div id="reader" style="width:300px; margin:30px auto;"></div>
+
+<h2 id="status">Ready to Scan</h2>
+<div id="result" style="font-size:20px;"></div>
+<div id="counter" style="margin-top:20px;"></div>
 
 <audio id="successSound">
   <source src="https://www.soundjay.com/buttons/sounds/button-3.mp3" type="audio/mpeg">
 </audio>
 
 <script>
-  const supabaseUrl = "https://iirtdewqfhxgoccaxkxm.supabase.co";
-  const supabaseKey = "sb_publishable_6tLW_KWUnL38KI_uOVaGCQ_mkQELQjM";
+const supabaseUrl = "https://iirtdewqfhxgoccaxkxm.supabase.co";
+const supabaseKey = "sb_publishable_6tLW_KWUnL38KI_uOVaGCQ_mkQELQjM";
+const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
 
-  const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
+async function updateCounter() {
+  const { count } = await supabaseClient
+    .from("guests")
+    .select("*", { count: "exact", head: true })
+    .eq("used", true);
 
-  const params = new URLSearchParams(window.location.search);
-  const guestCode = params.get("code");
+  document.getElementById("counter").innerText =
+    "Total Checked In: " + count;
+}
 
-  async function updateCounter() {
-    const { count } = await supabaseClient
-      .from("guests")
-      .select("*", { count: "exact", head: true })
-      .eq("used", true);
+async function processCode(code) {
 
-    document.getElementById("counter").innerText =
-      "Total Checked In: " + count;
+  const { data, error } = await supabaseClient
+    .from("guests")
+    .select("*")
+    .eq("code", code)
+    .single();
+
+  if (error || !data) {
+    showError("Guest Not Found");
+    return;
   }
 
-  async function checkGuest() {
-
-    if (!guestCode) {
-      updateCounter();
-      return;
-    }
-
-    const { data, error } = await supabaseClient
-      .from("guests")
-      .select("*")
-      .eq("code", guestCode)
-      .single();
-
-    if (error || !data) {
-      showError("Guest Not Found");
-      return;
-    }
-
-    if (data.used === true) {
-      showError("QR Code Already Used");
-      return;
-    }
-
-    await supabaseClient
-      .from("guests")
-      .update({ used: true })
-      .eq("code", guestCode);
-
-    showSuccess(data);
-    updateCounter();
+  if (data.used) {
+    showError("Already Checked In");
+    return;
   }
 
-  function showSuccess(data) {
-    document.body.style.background = "#16a34a";
-    document.getElementById("status").innerText = "✅ ACCESS GRANTED";
-    document.getElementById("status").style.color = "white";
+  await supabaseClient
+    .from("guests")
+    .update({ used: true })
+    .eq("code", code);
 
-    document.getElementById("result").innerHTML =
-      "<strong>Name:</strong> " + data.name + "<br>" +
-      "<strong>Plus One:</strong> " + (data.plus_one ? "Yes" : "No");
+  showSuccess(data);
+  updateCounter();
+}
 
-    document.getElementById("result").style.color = "white";
+function showSuccess(data) {
+  document.body.style.background = "#16a34a";
+  document.getElementById("status").innerText = "ACCESS GRANTED";
+  document.getElementById("result").innerHTML =
+    "Welcome " + data.name +
+    "<br>Plus One: " + (data.plus_one ? "Yes" : "No");
+  document.getElementById("successSound").play();
 
-    document.getElementById("successSound").play();
+  setTimeout(resetScreen, 4000);
+}
 
-    setTimeout(() => {
-      window.location.href = "checkin.html";
-    }, 4000);
+function showError(msg) {
+  document.body.style.background = "#dc2626";
+  document.getElementById("status").innerText = msg;
+  document.getElementById("result").innerHTML = "";
+  setTimeout(resetScreen, 4000);
+}
+
+function resetScreen() {
+  document.body.style.background = "black";
+  document.getElementById("status").innerText = "Ready to Scan";
+  document.getElementById("result").innerHTML = "";
+}
+
+const html5QrCode = new Html5Qrcode("reader");
+
+Html5Qrcode.getCameras().then(devices => {
+  if (devices && devices.length) {
+    html5QrCode.start(
+      devices[0].id,
+      { fps: 10, qrbox: 250 },
+      qrCodeMessage => {
+        html5QrCode.stop();
+        processCode(qrCodeMessage.split("code=")[1]);
+        setTimeout(() => html5QrCode.start(devices[0].id, { fps:10, qrbox:250 }, qrCodeMessage => {
+          processCode(qrCodeMessage.split("code=")[1]);
+        }), 5000);
+      }
+    );
   }
+});
 
-  function showError(message) {
-    document.body.style.background = "#dc2626";
-    document.getElementById("status").innerText = "❌ " + message;
-    document.getElementById("status").style.color = "white";
-    document.getElementById("result").innerHTML = "";
-
-    setTimeout(() => {
-      window.location.href = "checkin.html";
-    }, 4000);
-  }
-
-  checkGuest();
+updateCounter();
 </script>
 
 </body>
