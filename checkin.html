@@ -91,8 +91,35 @@ const html5QrCode = new Html5Qrcode("reader");
 
 Html5Qrcode.getCameras().then(devices => {
   if (devices && devices.length) {
+
+    // Try to find back camera
+    const backCamera = devices.find(device =>
+      device.label.toLowerCase().includes("back") ||
+      device.label.toLowerCase().includes("environment")
+    );
+
+    const cameraId = backCamera ? backCamera.id : devices[0].id;
+
     html5QrCode.start(
-      devices[0].id,
+      cameraId,
+      { fps: 10, qrbox: 250 },
+      qrCodeMessage => {
+        html5QrCode.stop();
+        processCode(qrCodeMessage.split("code=")[1]);
+
+        setTimeout(() => {
+          html5QrCode.start(
+            cameraId,
+            { fps: 10, qrbox: 250 },
+            qrCodeMessage => {
+              processCode(qrCodeMessage.split("code=")[1]);
+            }
+          );
+        }, 5000);
+      }
+    );
+  }
+});
       { fps: 10, qrbox: 250 },
       qrCodeMessage => {
         html5QrCode.stop();
