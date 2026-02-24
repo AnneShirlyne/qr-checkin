@@ -2,6 +2,7 @@
 <html>
 <head>
 <title>BOMEXA Check-In</title>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://unpkg.com/html5-qrcode"></script>
 
@@ -17,7 +18,7 @@ h2{font-size:28px;}
 #reader{width:300px;margin:auto;}
 button{
   padding:10px 20px;
-  margin:10px;
+  margin:8px;
   border:none;
   background:#d4af37;
   cursor:pointer;
@@ -27,22 +28,22 @@ input{
   font-size:16px;
 }
 .success{
-  font-size:40px;
+  font-size:38px;
   animation:pop .4s ease;
 }
 .error{
-  font-size:28px;
+  font-size:26px;
   color:red;
-}
-@keyframes pop{
-  0%{transform:scale(.6);opacity:0;}
-  100%{transform:scale(1);opacity:1;}
 }
 .counter{
   position:absolute;
   top:20px;
   right:30px;
   font-size:18px;
+}
+@keyframes pop{
+  0%{transform:scale(.6);opacity:0;}
+  100%{transform:scale(1);opacity:1;}
 }
 </style>
 </head>
@@ -59,12 +60,14 @@ if(sessionStorage.getItem("staffAuth") !== "true"){
 Checked In: <span id="count">0</span>
 </div>
 
-<h2 id="status">Ready to Scan</h2>
+<h2 id="status">Ready</h2>
 <div id="result"></div>
 
+<br>
 <div id="reader"></div>
 
-<br>
+<button onclick="startScanner()">Start Scanner</button>
+<button onclick="stopScanner()">Stop Scanner</button>
 <button onclick="switchCamera()">Switch Camera</button>
 
 <br><br>
@@ -74,14 +77,14 @@ Checked In: <span id="count">0</span>
 
 <script>
 
-// 🔹 YOUR SUPABASE INFO
+// 🔹 REPLACE WITH YOUR SUPABASE VALUES
 const supabaseUrl = "https://iirtdewqfhxgoccaxkxm.supabase.co";
 const supabaseKey = "sb_publishable_6tLW_KWUnL38KI_uOVaGCQ_mkQELQjM";
 const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
 
 let html5QrCode;
 let currentCamera = "environment";
-let checkedCount = 0;
+let scannerRunning = false;
 
 async function updateCounter(){
   const { count } = await supabaseClient
@@ -93,7 +96,7 @@ async function updateCounter(){
 
 function restart(){
   setTimeout(()=>{
-    document.getElementById("status").innerText="Ready to Scan";
+    document.getElementById("status").innerText="Ready";
     document.getElementById("result").innerHTML="";
   },4000);
 }
@@ -148,23 +151,36 @@ function onScanSuccess(decodedText){
   processCode(decodedText);
 }
 
-function startScanner(){
+async function startScanner(){
+  if(scannerRunning) return;
+
   html5QrCode=new Html5Qrcode("reader");
-  html5QrCode.start(
+
+  await html5QrCode.start(
     { facingMode: currentCamera },
     { fps:10, qrbox:250 },
     onScanSuccess
   );
+
+  scannerRunning=true;
+}
+
+async function stopScanner(){
+  if(html5QrCode && scannerRunning){
+    await html5QrCode.stop();
+    scannerRunning=false;
+  }
 }
 
 function switchCamera(){
+  if(!scannerRunning) return;
+
   html5QrCode.stop().then(()=>{
     currentCamera = currentCamera === "environment" ? "user" : "environment";
     startScanner();
   });
 }
 
-startScanner();
 updateCounter();
 
 </script>
