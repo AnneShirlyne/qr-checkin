@@ -2,7 +2,11 @@
 <html>
 <head>
   <title>Event Check-In</title>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script type="module">
+  import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+
+  window.createClient = createClient;
+</script>
 
   <style>
     body {
