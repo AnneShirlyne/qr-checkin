@@ -1,13 +1,53 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Event Check-In</title>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-</head>
-<body style="font-family: Arial; text-align: center; margin-top: 50px; background:#111; color:white;">
+  <title>BOMEXA Check-In</title>
 
-<h2 id="status">Checking Guest...</h2>
-<div id="result" style="font-size: 20px; margin-top: 20px;"></div>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://unpkg.com/html5-qrcode"></script>
+
+  <style>
+    body {
+      background:#111;
+      color:white;
+      font-family:Arial;
+      text-align:center;
+      margin-top:40px;
+    }
+
+    button {
+      padding:10px 20px;
+      margin:10px;
+      border-radius:8px;
+      border:none;
+      cursor:pointer;
+    }
+
+    #reader {
+      width:300px;
+      margin:auto;
+      margin-top:20px;
+    }
+
+    .success { color:lime; font-size:22px; }
+    .error { color:red; font-size:22px; }
+  </style>
+</head>
+
+<body>
+
+<h2 id="status">Ready to Scan</h2>
+
+<div id="reader"></div>
+
+<div style="margin-top:20px;">
+  <button onclick="switchCamera()">Switch Camera</button>
+</div>
+
+<div style="margin-top:30px;">
+  <input type="text" id="manualCode" placeholder="Enter code manually">
+  <button onclick="manualCheck()">Check In</button>
+</div>
 
 <script>
 
@@ -16,62 +56,91 @@
     window.location.href = "login.html";
   }
 
-  // 🔹 Supabase connection
   const supabaseUrl = "https://iirtdewqfhxgoccaxkxm.supabase.co";
   const supabaseKey = "sb_publishable_6tLW_KWUnL38KI_uOVaGCQ_mkQELQjM";
-
   const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
 
-  const params = new URLSearchParams(window.location.search);
-  const guestCode = params.get("code");
+  const html5QrCode = new Html5Qrcode("reader");
 
-  async function checkGuest() {
+  let currentCamera = "environment";
 
-    if (!guestCode) {
-      document.getElementById("status").innerText = "Invalid QR Code";
-      return;
-    }
+  function startScanner() {
+    html5QrCode.start(
+      { facingMode: currentCamera },
+      { fps: 10, qrbox: 250 },
+      qrMessage => {
+        html5QrCode.stop();
+        const codeParam = new URL(qrMessage).searchParams.get("code");
+        if (codeParam) processCode(codeParam);
+        else processCode(qrMessage);
+      }
+    );
+  }
+
+  function switchCamera() {
+    html5QrCode.stop().then(() => {
+      currentCamera = currentCamera === "environment" ? "user" : "environment";
+      startScanner();
+    });
+  }
+
+  async function processCode(code) {
+
+    document.getElementById("status").innerText = "Checking Guest...";
 
     const { data, error } = await supabaseClient
       .from("guests")
       .select("*")
-      .eq("code", guestCode)
+      .eq("code", code)
       .single();
 
     if (error || !data) {
-      document.getElementById("status").innerText = "Guest Not Found";
+      document.getElementById("status").innerHTML =
+        "<div class='error'>Guest Not Found</div>";
+      restart();
       return;
     }
 
-    if (data.used === true) {
-      document.getElementById("status").innerText = "❌ QR Code Already Used";
+    if (data.used) {
+      document.getElementById("status").innerHTML =
+        "<div class='error'>QR Code Already Used</div>";
+      restart();
       return;
     }
 
-    // Mark as used
-    const { error: updateError } = await supabaseClient
+    await supabaseClient
       .from("guests")
       .update({ used: true })
-      .eq("code", guestCode);
+      .eq("code", code);
 
-    if (updateError) {
-      document.getElementById("status").innerText = "Error updating guest";
-      return;
-    }
+    document.getElementById("status").innerHTML =
+      "<div class='success'>Welcome " + data.name + "</div>";
 
-    document.getElementById("status").innerText = "✅ Welcome!";
-    document.getElementById("result").innerHTML =
-      "<strong>Name:</strong> " + data.name + "<br>" +
-      "<strong>Plus One:</strong> " + (data.plus_one ? "Yes" : "No");
-
-    // Auto reset after 5 seconds
-    setTimeout(() => {
-      window.location.href = "checkin.html";
-    }, 5000);
-
+    restart();
   }
 
-  checkGuest();
+  function manualCheck() {
+    const code = document.getElementById("manualCode").value.trim();
+    if (code) processCode(code);
+  }
+
+  function restart() {
+    setTimeout(() => {
+      document.getElementById("status").innerText = "Ready to Scan";
+      document.getElementById("manualCode").value = "";
+      startScanner();
+    }, 4000);
+  }
+
+  // If QR link contains ?code= param
+  const params = new URLSearchParams(window.location.search);
+  const urlCode = params.get("code");
+
+  if (urlCode) {
+    processCode(urlCode);
+  } else {
+    startScanner();
+  }
 
 </script>
 
