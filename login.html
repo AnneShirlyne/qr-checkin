@@ -1,31 +1,45 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Staff Login</title>
+<title>Staff Access</title>
+<style>
+body{
+  background:#0f0f0f;
+  color:#d4af37;
+  font-family:Arial;
+  text-align:center;
+  margin-top:150px;
+}
+input{
+  padding:12px;
+  font-size:18px;
+  border:none;
+  border-radius:5px;
+}
+button{
+  padding:12px 25px;
+  font-size:18px;
+  background:#d4af37;
+  border:none;
+  margin-top:15px;
+  cursor:pointer;
+}
+</style>
 </head>
-<body style="background:black;color:white;text-align:center;margin-top:100px;font-family:Arial;">
+<body>
 
-<h1>Event Staff Access</h1>
-
-<input type="password" id="password" placeholder="Enter Staff Password"
-style="padding:10px;font-size:18px;border-radius:8px;border:none;">
-
-<br><br>
-
-<button onclick="login()" 
-style="padding:10px 20px;font-size:18px;border-radius:8px;background:gold;border:none;">
-Enter
-</button>
+<h2>Staff Login</h2>
+<input type="password" id="pass" placeholder="Enter Password">
+<br>
+<button onclick="login()">Enter</button>
 
 <script>
 function login(){
-  const pass = document.getElementById("password").value;
-
-  if(pass === "Elite2026"){   // 🔐 change this password
-    sessionStorage.setItem("staffAuth", "true");
-    window.location.href = "checkin.html";
+  if(document.getElementById("pass").value === "Event2026"){
+    sessionStorage.setItem("staffAuth","true");
+    window.location.href="checkin.html";
   } else {
-    alert("Wrong password");
+    alert("Incorrect Password");
   }
 }
 </script>
