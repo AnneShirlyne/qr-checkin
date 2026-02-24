@@ -11,14 +11,31 @@
 
 <h1>Event Check-In</h1>
 
-<div id="reader" style="width:300px; margin:20px auto;"></div>
+<div style="margin-bottom:20px;">
+  <button onclick="showScanner()" style="padding:8px 15px; background:gold; border:none;">Scan QR</button>
+  <button onclick="showManual()" style="padding:8px 15px; background:gold; border:none;">Manual Check-In</button>
+</div>
 
-<button onclick="switchCamera()" 
-  style="padding:8px 15px; background:gold; border:none; margin-bottom:15px;">
-  Switch Camera
-</button>
+<!-- SCANNER SECTION -->
+<div id="scannerSection">
+  <div id="reader" style="width:300px; margin:20px auto;"></div>
+  <button onclick="switchCamera()" 
+    style="padding:8px 15px; background:gold; border:none;">
+    Switch Camera
+  </button>
+</div>
 
-<h2 id="status">Ready to Scan</h2>
+<!-- MANUAL SECTION -->
+<div id="manualSection" style="display:none; margin-top:20px;">
+  <input type="text" id="manualInput" placeholder="Enter Name or Code"
+    style="padding:10px; font-size:16px; width:250px;">
+  <button onclick="manualSearch()" 
+    style="padding:10px; background:gold; border:none;">
+    Check In
+  </button>
+</div>
+
+<h2 id="status" style="margin-top:20px;">Ready</h2>
 <div id="result" style="font-size:20px; margin-top:10px;"></div>
 <div id="counter" style="margin-top:20px;"></div>
 
@@ -32,11 +49,12 @@ const supabaseKey = "sb_publishable_6tLW_KWUnL38KI_uOVaGCQ_mkQELQjM";
 const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
 
 let html5QrCode = new Html5Qrcode("reader");
-let currentCameraId = null;
 let cameras = [];
+let currentCameraId = null;
+let scannerRunning = false;
 
 async function updateCounter() {
-  const { count } = await supabaseClient
+  const { count } = await supabaseClient 
     .from("guests")
     .select("*", { count: "exact", head: true })
     .eq("used", true);
@@ -45,16 +63,8 @@ async function updateCounter() {
     "Total Checked In: " + (count || 0);
 }
 
-async function processCode(code) {
-  if (!code) return;
-
-  const { data, error } = await supabaseClient
-    .from("guests")
-    .select("*")
-    .eq("code", code)
-    .single();
-
-  if (error || !data) {
+async function processGuest(data) {
+  if (!data) {
     showError("Guest Not Found");
     return;
   }
@@ -67,10 +77,32 @@ async function processCode(code) {
   await supabaseClient
     .from("guests")
     .update({ used: true })
-    .eq("code", code);
+    .eq("code", data.code);
 
   showSuccess(data);
   updateCounter();
+}
+
+async function processCode(code) {
+  const { data } = await supabaseClient
+    .from("guests")
+    .select("*")
+    .eq("code", code)
+    .single();
+
+  processGuest(data);
+}
+
+async function manualSearch() {
+  const input = document.getElementById("manualInput").value;
+
+  const { data } = await supabaseClient
+    .from("guests")
+    .select("*")
+    .or(`name.ilike.%${input}%,code.eq.${input}`)
+    .limit(1);
+
+  processGuest(data[0]);
 }
 
 function showSuccess(data) {
@@ -80,52 +112,46 @@ function showSuccess(data) {
     "Welcome " + data.name +
     "<br>Plus One: " + (data.plus_one ? "Yes" : "No");
   document.getElementById("successSound").play();
-
   setTimeout(resetScreen, 4000);
 }
 
-function showError(message) {
+function showError(msg) {
   document.body.style.background = "#dc2626";
-  document.getElementById("status").innerText = message;
+  document.getElementById("status").innerText = msg;
   document.getElementById("result").innerHTML = "";
   setTimeout(resetScreen, 4000);
 }
 
 function resetScreen() {
   document.body.style.background = "black";
-  document.getElementById("status").innerText = "Ready to Scan";
+  document.getElementById("status").innerText = "Ready";
   document.getElementById("result").innerHTML = "";
 }
 
 async function startScanner(cameraId) {
+  scannerRunning = true;
   await html5QrCode.start(
     cameraId,
     { fps: 10, qrbox: 250 },
     qrMessage => {
       html5QrCode.stop().then(() => {
+        scannerRunning = false;
         try {
           const url = new URL(qrMessage);
-          const code = url.searchParams.get("code");
-          processCode(code);
+          processCode(url.searchParams.get("code"));
         } catch {
           processCode(qrMessage);
         }
-        setTimeout(() => startScanner(currentCameraId), 5000);
+        setTimeout(() => startScanner(currentCameraId), 4000);
       });
-    },
-    errorMessage => {}
+    }
   );
 }
 
 async function initScanner() {
   cameras = await Html5Qrcode.getCameras();
+  if (!cameras.length) return;
 
-  if (!cameras || cameras.length === 0) {
-    document.getElementById("status").innerText = "No Camera Found";
-    return;
-  }
-
-  // Try to find back camera first
   const backCam = cameras.find(cam =>
     cam.label.toLowerCase().includes("back") ||
     cam.label.toLowerCase().includes("environment")
@@ -139,12 +165,22 @@ async function switchCamera() {
   if (cameras.length < 2) return;
 
   await html5QrCode.stop();
+  scannerRunning = false;
 
   const currentIndex = cameras.findIndex(cam => cam.id === currentCameraId);
-  const nextIndex = (currentIndex + 1) % cameras.length;
-  currentCameraId = cameras[nextIndex].id;
-
+  currentCameraId = cameras[(currentIndex + 1) % cameras.length].id;
   startScanner(currentCameraId);
+}
+
+function showScanner() {
+  document.getElementById("scannerSection").style.display = "block";
+  document.getElementById("manualSection").style.display = "none";
+}
+
+function showManual() {
+  document.getElementById("scannerSection").style.display = "none";
+  document.getElementById("manualSection").style.display = "block";
+  if (scannerRunning) html5QrCode.stop();
 }
 
 updateCounter();
