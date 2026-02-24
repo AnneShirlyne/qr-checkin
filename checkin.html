@@ -7,14 +7,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 
-<body style="background:black; color:gold; font-family:Arial; text-align:center;">
+<body style="background:black; color:gold; font-family:Arial; text-align:center; margin:0; padding:20px;">
 
-<h1 style="margin-top:30px;">Event Check-In</h1>
+<h1>Event Check-In</h1>
 
-<div id="reader" style="width:300px; margin:30px auto;"></div>
+<div id="reader" style="width:300px; margin:20px auto;"></div>
+
+<button onclick="switchCamera()" 
+  style="padding:8px 15px; background:gold; border:none; margin-bottom:15px;">
+  Switch Camera
+</button>
 
 <h2 id="status">Ready to Scan</h2>
-<div id="result" style="font-size:20px;"></div>
+<div id="result" style="font-size:20px; margin-top:10px;"></div>
 <div id="counter" style="margin-top:20px;"></div>
 
 <audio id="successSound">
@@ -26,6 +31,10 @@ const supabaseUrl = "https://iirtdewqfhxgoccaxkxm.supabase.co";
 const supabaseKey = "sb_publishable_6tLW_KWUnL38KI_uOVaGCQ_mkQELQjM";
 const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
 
+let html5QrCode = new Html5Qrcode("reader");
+let currentCameraId = null;
+let cameras = [];
+
 async function updateCounter() {
   const { count } = await supabaseClient
     .from("guests")
@@ -33,10 +42,11 @@ async function updateCounter() {
     .eq("used", true);
 
   document.getElementById("counter").innerText =
-    "Total Checked In: " + count;
+    "Total Checked In: " + (count || 0);
 }
 
 async function processCode(code) {
+  if (!code) return;
 
   const { data, error } = await supabaseClient
     .from("guests")
@@ -74,9 +84,9 @@ function showSuccess(data) {
   setTimeout(resetScreen, 4000);
 }
 
-function showError(msg) {
+function showError(message) {
   document.body.style.background = "#dc2626";
-  document.getElementById("status").innerText = msg;
+  document.getElementById("status").innerText = message;
   document.getElementById("result").innerHTML = "";
   setTimeout(resetScreen, 4000);
 }
@@ -87,58 +97,59 @@ function resetScreen() {
   document.getElementById("result").innerHTML = "";
 }
 
-const html5QrCode = new Html5Qrcode("reader");
+async function startScanner(cameraId) {
+  await html5QrCode.start(
+    cameraId,
+    { fps: 10, qrbox: 250 },
+    qrMessage => {
+      html5QrCode.stop().then(() => {
+        try {
+          const url = new URL(qrMessage);
+          const code = url.searchParams.get("code");
+          processCode(code);
+        } catch {
+          processCode(qrMessage);
+        }
+        setTimeout(() => startScanner(currentCameraId), 5000);
+      });
+    },
+    errorMessage => {}
+  );
+}
 
-Html5Qrcode.getCameras().then(devices => {
-  if (devices && devices.length) {
+async function initScanner() {
+  cameras = await Html5Qrcode.getCameras();
 
-    // Try to find back camera
-    const backCamera = devices.find(device =>
-      device.label.toLowerCase().includes("back") ||
-      device.label.toLowerCase().includes("environment")
-    );
-
-    const cameraId = backCamera ? backCamera.id : devices[0].id;
-
-    html5QrCode.start(
-      cameraId,
-      { fps: 10, qrbox: 250 },
-      qrCodeMessage => {
-        html5QrCode.stop();
-        processCode(qrCodeMessage.split("code=")[1]);
-
-        setTimeout(() => {
-          html5QrCode.start(
-            cameraId,
-            { fps: 10, qrbox: 250 },
-            qrCodeMessage => {
-              processCode(qrCodeMessage.split("code=")[1]);
-            }
-          );
-        }, 5000);
-      }
-    );
+  if (!cameras || cameras.length === 0) {
+    document.getElementById("status").innerText = "No Camera Found";
+    return;
   }
-});
-      { fps: 10, qrbox: 250 },
-      qrCodeMessage => {
-        html5QrCode.stop();
-        processCode(qrCodeMessage.split("code=")[1]);
-        setTimeout(() => html5QrCode.start(devices[0].id, { fps:10, qrbox:250 }, qrCodeMessage => {
-          processCode(qrCodeMessage.split("code=")[1]);
-        }), 5000);
-      }
-    );
-  }
-});
+
+  // Try to find back camera first
+  const backCam = cameras.find(cam =>
+    cam.label.toLowerCase().includes("back") ||
+    cam.label.toLowerCase().includes("environment")
+  );
+
+  currentCameraId = backCam ? backCam.id : cameras[0].id;
+  startScanner(currentCameraId);
+}
+
+async function switchCamera() {
+  if (cameras.length < 2) return;
+
+  await html5QrCode.stop();
+
+  const currentIndex = cameras.findIndex(cam => cam.id === currentCameraId);
+  const nextIndex = (currentIndex + 1) % cameras.length;
+  currentCameraId = cameras[nextIndex].id;
+
+  startScanner(currentCameraId);
+}
 
 updateCounter();
+initScanner();
 </script>
 
 </body>
 </html>
-      
-
-
-
-  
