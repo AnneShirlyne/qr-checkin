@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Bomexa Invitation</title>
+<title>Event Invitation</title>
 
 <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -16,24 +16,35 @@ body{
   overflow:hidden;
 }
 
-/* Watermark */
+/* Smaller Subtle Watermark */
 body::before{
-  content:"BOMEXA ACCESS";
+  content:"OFFICIAL ACCESS";
   position:fixed;
-  top:40%;
-  left:-20%;
-  width:150%;
-  font-size:60px;
-  color:rgba(212,175,55,0.05);
-  transform:rotate(-25deg);
+  top:45%;
+  left:50%;
+  transform:translate(-50%, -50%) rotate(-25deg);
+  font-size:40px;
+  color:rgba(212,175,55,0.04);
   pointer-events:none;
+  white-space:nowrap;
+}
+
+/* White QR Container */
+.qr-wrapper{
+  position:relative;
+  width:270px;
+  height:270px;
+  margin:30px auto;
+  background:#ffffff;
+  padding:10px;
+  border-radius:16px;
+  box-shadow:0 0 25px rgba(212,175,55,0.3);
 }
 
 #qrcode{
-  margin:30px auto;
-  position:relative;
   width:250px;
   height:250px;
+  margin:auto;
 }
 
 /* Gold Logo Center */
@@ -42,17 +53,17 @@ body::before{
   top:50%;
   left:50%;
   transform:translate(-50%, -50%);
-  width:60px;
-  height:60px;
+  width:55px;
+  height:55px;
   background:#d4af37;
   border-radius:12px;
   display:flex;
   align-items:center;
   justify-content:center;
   font-weight:bold;
-  font-size:32px;
+  font-size:28px;
   color:#000;
-  box-shadow:0 0 15px rgba(212,175,55,0.6);
+  box-shadow:0 0 12px rgba(212,175,55,0.7);
 }
 
 h2{
@@ -70,7 +81,8 @@ p{
 
 <h2 id="guestName">Loading Invitation...</h2>
 
-<div id="qrcode">
+<div class="qr-wrapper">
+  <div id="qrcode"></div>
   <div class="logo">B</div>
 </div>
 
@@ -80,7 +92,7 @@ p{
 
 // 🔹 Replace with your real values
 const supabaseUrl = "https://iirtdewqfhxgoccaxkxm.supabase.co";
-const supabaseKey = "YOUR_PUBLIC_ANON_KEY";
+const supabaseKey = "sb_publishable_6tLW_KWUnL38KI_uOVaGCQ_mkQELQjM";
 const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
 
 // Get code from URL
