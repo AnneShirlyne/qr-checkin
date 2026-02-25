@@ -15,32 +15,44 @@ body{
   margin-top:40px;
 }
 h2{font-size:28px;}
-#reader{width:300px;margin:auto;}
+
+#reader{
+  width:300px;
+  margin:auto;
+}
+
 button{
   padding:10px 20px;
   margin:8px;
   border:none;
   background:#d4af37;
   cursor:pointer;
+  font-weight:bold;
 }
+
 input{
   padding:10px;
   font-size:16px;
 }
+
 .success{
-  font-size:38px;
+  font-size:40px;
   animation:pop .4s ease;
 }
+
 .error{
   font-size:26px;
   color:red;
 }
-.counter{
+
+.counterBox{
   position:absolute;
   top:20px;
   right:30px;
-  font-size:18px;
+  text-align:right;
+  font-size:16px;
 }
+
 @keyframes pop{
   0%{transform:scale(.6);opacity:0;}
   100%{transform:scale(1);opacity:1;}
@@ -56,8 +68,10 @@ if(sessionStorage.getItem("staffAuth") !== "true"){
 }
 </script>
 
-<div class="counter">
-Checked In: <span id="count">0</span>
+<div class="counterBox">
+<div>Guests: <span id="guestCount">0</span></div>
+<div>Plus-Ones: <span id="plusCount">0</span></div>
+<div>Total Attending: <span id="totalCount">0</span></div>
 </div>
 
 <h2 id="status">Ready</h2>
@@ -77,7 +91,7 @@ Checked In: <span id="count">0</span>
 
 <script>
 
-// 🔹 REPLACE WITH YOUR SUPABASE VALUES
+// 🔹 YOUR SUPABASE
 const supabaseUrl = "https://iirtdewqfhxgoccaxkxm.supabase.co";
 const supabaseKey = "sb_publishable_6tLW_KWUnL38KI_uOVaGCQ_mkQELQjM";
 const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
@@ -86,13 +100,41 @@ let html5QrCode;
 let currentCamera = "environment";
 let scannerRunning = false;
 
-async function updateCounter(){
-  const { count } = await supabaseClient
+/* =============================
+   COUNTER SYSTEM
+============================= */
+
+async function updateCounters(){
+
+  const { data, error } = await supabaseClient
     .from("guests")
-    .select("*", { count: "exact", head: true })
+    .select("id, plus_one")
     .eq("used", true);
-  document.getElementById("count").innerText = count;
+
+  if(error || !data){
+    document.getElementById("guestCount").innerText = 0;
+    document.getElementById("plusCount").innerText = 0;
+    document.getElementById("totalCount").innerText = 0;
+    return;
+  }
+
+  let guestCount = data.length;
+  let plusCount = 0;
+
+  data.forEach(g=>{
+    if(g.plus_one && g.plus_one.trim() !== ""){
+      plusCount++;
+    }
+  });
+
+  document.getElementById("guestCount").innerText = guestCount;
+  document.getElementById("plusCount").innerText = plusCount;
+  document.getElementById("totalCount").innerText = guestCount + plusCount;
 }
+
+/* =============================
+   RESET SCREEN
+============================= */
 
 function restart(){
   setTimeout(()=>{
@@ -100,6 +142,10 @@ function restart(){
     document.getElementById("result").innerHTML="";
   },4000);
 }
+
+/* =============================
+   PROCESS CHECK-IN
+============================= */
 
 async function processCode(inputValue){
 
@@ -126,10 +172,17 @@ async function processCode(inputValue){
     return;
   }
 
-  await supabaseClient
+  const { error: updateError } = await supabaseClient
     .from("guests")
     .update({ used:true })
     .eq("id", data.id);
+
+  if(updateError){
+    document.getElementById("status").innerHTML=
+      "<div class='error'>Update Failed</div>";
+    restart();
+    return;
+  }
 
   document.getElementById("status").innerHTML=
     "<div class='success'>🎉 Welcome "+data.name+"</div>";
@@ -138,14 +191,22 @@ async function processCode(inputValue){
     "<strong>Plus One:</strong> "+
     (data.plus_one ? data.plus_one : "None");
 
-  updateCounter();
+  updateCounters();
   restart();
 }
+
+/* =============================
+   MANUAL CHECK
+============================= */
 
 function manualCheck(){
   const value=document.getElementById("manualInput").value;
   if(value) processCode(value);
 }
+
+/* =============================
+   QR SCANNER
+============================= */
 
 function onScanSuccess(decodedText){
   processCode(decodedText);
@@ -181,7 +242,11 @@ function switchCamera(){
   });
 }
 
-updateCounter();
+/* =============================
+   INITIAL LOAD
+============================= */
+
+updateCounters();
 
 </script>
 
