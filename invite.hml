@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>BOMEXA Invitation</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs/qrcode.min.js"></script>
+
+<style>
+body{
+  background:#0f0f0f;
+  color:#d4af37;
+  font-family:Arial;
+  text-align:center;
+  padding-top:60px;
+}
+
+.container{
+  max-width:400px;
+  margin:auto;
+  padding:30px;
+  border:1px solid rgba(212,175,55,0.3);
+  border-radius:15px;
+  box-shadow:0 0 25px rgba(212,175,55,0.2);
+}
+
+h1{
+  font-size:28px;
+  margin-bottom:10px;
+}
+
+#guestName{
+  font-size:22px;
+  margin-bottom:5px;
+}
+
+#plusOne{
+  font-size:16px;
+  margin-bottom:25px;
+  opacity:0.8;
+}
+
+#qrcode{
+  margin:auto;
+  padding:15px;
+  background:white;
+  display:inline-block;
+  border-radius:12px;
+  position:relative;
+}
+
+.rotateGlow{
+  position:absolute;
+  width:120%;
+  height:120%;
+  top:-10%;
+  left:-10%;
+  border-radius:50%;
+  border:2px dashed rgba(212,175,55,0.4);
+  animation:spin 8s linear infinite;
+  pointer-events:none;
+}
+
+@keyframes spin{
+  0%{transform:rotate(0deg);}
+  100%{transform:rotate(360deg);}
+}
+
+.watermark{
+  margin-top:30px;
+  font-size:12px;
+  opacity:0.3;
+}
+
+.present{
+  margin-top:20px;
+  font-size:16px;
+  letter-spacing:1px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>BOMEXA</h1>
+
+<div id="guestName">Loading...</div>
+<div id="plusOne"></div>
+
+<div style="position:relative; display:inline-block;">
+  <div id="qrcode"></div>
+  <div class="rotateGlow"></div>
+</div>
+
+<div class="present">
+Please present this QR code to staff for entry
+</div>
+
+<div class="watermark">
+Private Access • Secure Entry
+</div>
+
+</div>
+
+<script>
+
+const supabaseUrl = "https://iirtdewqfhxgoccaxkxm.supabase.co";
+const supabaseKey = "sb_publishable_6tLW_KWUnL38KI_uOVaGCQ_mkQELQjM";
+const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+const params = new URLSearchParams(window.location.search);
+const code = params.get("code");
+
+async function loadGuest(){
+
+  if(!code){
+    document.getElementById("guestName").innerText="Invalid Invitation";
+    return;
+  }
+
+  const { data, error } = await supabaseClient
+    .from("guests")
+    .select("*")
+    .eq("code", code)
+    .single();
+
+  if(error || !data){
+    document.getElementById("guestName").innerText="Invitation Not Found";
+    return;
+  }
+
+  document.getElementById("guestName").innerText = data.name;
+
+  if(data.plus_one){
+    document.getElementById("plusOne").innerText = "Plus One: " + data.plus_one;
+  }
+
+  new QRCode(document.getElementById("qrcode"), {
+    text: "https://qr-checkin-six.vercel.app/checkin.html?code=" + code,
+    width: 220,
+    height: 220
+  });
+
+}
+
+loadGuest();
+
+</script>
+
+</body>
+</html>
